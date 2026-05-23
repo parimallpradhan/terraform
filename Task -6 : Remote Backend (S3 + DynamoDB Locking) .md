@@ -315,8 +315,163 @@ You will learn:
 
 ---
 
-Just say:
+This warning comes from newer versions of **Terraform AWS Backend (S3)**.
 
-👉 **TASK 7**
+---
 
-and we will move into **real production-grade Terraform modular architecture used in companies**.
+# Why Are You Seeing This Warning?
+
+Your backend configuration probably looks like this:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "my-terraform-state"
+    key            = "eks/terraform.tfstate"
+    region         = "ap-south-1"
+    dynamodb_table = "terraform-locks"
+  }
+}
+```
+
+Terraform displays:
+
+```text
+Warning: Deprecated Parameter
+
+The parameter "dynamodb_table" is deprecated.
+Use parameter "use_lockfile" instead.
+```
+
+This means **DynamoDB-based state locking is being phased out** in favor of the newer **S3 native lockfile mechanism**.
+
+---
+
+# Old Method (Deprecated)
+
+Terraform used a DynamoDB table to prevent multiple users from modifying the state simultaneously.
+
+```text
+Terraform User A
+        │
+        ▼
+ DynamoDB Lock Table
+        │
+        ▼
+ S3 State File
+```
+
+Example:
+
+```hcl
+dynamodb_table = "terraform-locks"
+```
+
+---
+
+# New Method (Recommended)
+
+Use S3 lockfiles instead:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket       = "my-terraform-state"
+    key          = "eks/terraform.tfstate"
+    region       = "ap-south-1"
+    use_lockfile = true
+  }
+}
+```
+
+Now Terraform creates a lock file directly in S3:
+
+```text
+terraform.tfstate.lock.info
+```
+
+No DynamoDB table is required.
+
+---
+
+# How to Migrate
+
+### Step 1: Update Backend Configuration
+
+Replace:
+
+```hcl
+dynamodb_table = "terraform-locks"
+```
+
+with:
+
+```hcl
+use_lockfile = true
+```
+
+---
+
+### Step 2: Reinitialize Terraform
+
+```bash
+terraform init -reconfigure
+```
+
+or
+
+```bash
+terraform init -migrate-state
+```
+
+depending on your setup.
+
+---
+
+### Step 3: Verify
+
+Run:
+
+```bash
+terraform plan
+```
+
+You should no longer see the deprecation warning.
+
+---
+
+# Interview Question
+
+### Q: Why was DynamoDB used with Terraform state?
+
+**Answer:**
+
+DynamoDB provided state locking to prevent concurrent Terraform operations from corrupting the remote state file stored in S3.
+
+---
+
+### Q: Why is `dynamodb_table` deprecated?
+
+**Answer:**
+
+Recent Terraform versions support **native S3 lockfiles** through `use_lockfile = true`, eliminating the need for a separate DynamoDB table for state locking.
+
+---
+
+# Production Recommendation
+
+For **new projects**:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket       = "company-terraform-state"
+    key          = "prod/terraform.tfstate"
+    region       = "ap-south-1"
+    use_lockfile = true
+  }
+}
+```
+
+For **existing projects**, you can continue using DynamoDB for now, but plan to migrate to `use_lockfile = true` because `dynamodb_table` is deprecated and may be removed in a future Terraform release.
+
