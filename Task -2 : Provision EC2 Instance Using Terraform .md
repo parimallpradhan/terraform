@@ -64,7 +64,7 @@ provider "aws" {
 }
 
 resource "aws_instance" "devops_ec2" {
-  ami           = "ami-0f58b397bc5c1f2e8"
+  ami           = "ami-09ed39e30153c3bf9"
   instance_type = "t2.micro"
 
   tags = {
