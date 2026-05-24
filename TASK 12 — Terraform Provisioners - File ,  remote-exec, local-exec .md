@@ -67,16 +67,41 @@ provider "aws" {
   region = "ap-south-1"
 }
 
+resource "aws_security_group" "allow_ssh" {
+  name = "allow-ssh"
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # test only
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
 resource "aws_instance" "web" {
-  ami           = "ami-0f58b397bc5c1f2e8"
-  instance_type = "t2.micro"
-  key_name      = "my-key"  # REQUIRED for SSH
+  ami           = "ami-07a00cf47dbbc844c"
+  instance_type = "t3.micro"
+  key_name      = "lamdatest"  # REQUIRED for SSH
+
+ associate_public_ip_address = true
+
+  vpc_security_group_ids = [
+    aws_security_group.allow_ssh.id
+  ]
 
   connection {
     type        = "ssh"
     user        = "ubuntu"
-    private_key = file("my-key.pem")
+    private_key = file("lamdatest.pem")
     host        = self.public_ip
+    timeout     = "5m"
   }
 
   provisioner "file" {
@@ -90,6 +115,7 @@ resource "aws_instance" "web" {
       "sudo bash /home/ubuntu/script.sh"
     ]
   }
+  
 
   tags = {
     Name = "Provisioner-EC2"
